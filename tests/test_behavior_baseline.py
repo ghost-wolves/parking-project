@@ -11,12 +11,22 @@ def test_ev_subclass_relationship_fixed():
     assert isinstance(ecar, EV.ElectricVehicle)
     assert isinstance(ebike, EV.ElectricVehicle)
 
-@pytest.mark.xfail(reason="Baseline bug: EV finder param mismatch causes NameError", strict=True)
-def test_ev_finder_param_mismatch_xfail():
-    PM = import_src("ParkingManager")  # safe: UI guarded by main()
-    EV = import_src("ElectricVehicle")
-    lot = PM.ParkingLot()
-    lot.createParkingLot(1, 1, 1)
-    lot.evSlots[0] = EV.ElectricCar("R1", "Tesla", "3", "Blue")
-    # This uses param name "color" but references undefined 'make' in baseline
-    lot.getSlotNumFromMakeEv("Tesla")  # should raise NameError in baseline
+from src.parking_service import ParkingService, VehicleSpec
+
+def test_ev_finders_by_make_and_model():
+    svc = ParkingService(capacity=0, ev_capacity=3, level=1)
+    # Seed two EVs
+    r1 = svc.park(VehicleSpec("E1", "Tesla", "Model 3", "Blue", fuel="EV", kind="CAR"))
+    r2 = svc.park(VehicleSpec("E2", "Nissan","Leaf","Green", fuel="EV", kind="CAR"))
+    assert r1["ok"] and r2["ok"]
+
+    # Make-based lookup
+    assert svc.ev_slots_by_make("Tesla") == [1]
+    assert svc.ev_slots_by_make("Nissan") == [2]
+    assert svc.ev_slots_by_make("Ford") == []
+
+    # Model-based lookup
+    assert svc.ev_slots_by_model("Model 3") == [1]
+    assert svc.ev_slots_by_model("Leaf") == [2]
+    assert svc.ev_slots_by_model("Bolt") == []
+

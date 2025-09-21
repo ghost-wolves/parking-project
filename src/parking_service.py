@@ -207,3 +207,26 @@ class ParkingService:
                     }
                 )
         return rows
+
+        # -------- EV finders (fixed) --------
+    def ev_slots_by_make(self, make: str) -> list[int]:
+        """Return 1-based UI slot numbers for EVs that match the given make."""
+        out: list[int] = []
+        m = (make or "").strip()
+        if not m:
+            return out
+        for i, v in enumerate(self.evSlots):
+            if v != -1 and str(v.make) == m:
+                out.append(self._to_ui(i))
+        return out
+
+    def ev_slots_by_model(self, model: str) -> list[int]:
+        """Return 1-based UI slot numbers for EVs that match the given model."""
+        out: list[int] = []
+        md = (model or "").strip()
+        if not md:
+            return out
+        for i, v in enumerate(self.evSlots):
+            if v != -1 and str(v.model) == md:
+                out.append(self._to_ui(i))
+        return out
