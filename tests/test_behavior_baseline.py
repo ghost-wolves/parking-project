@@ -1,5 +1,5 @@
 import importlib
-import pytest
+import pytest # type: ignore
 
 def import_src(mod: str):
     return importlib.import_module(mod)

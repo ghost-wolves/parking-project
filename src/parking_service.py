@@ -42,12 +42,15 @@ class StatusRow(TypedDict):
 
 class ParkingService:
     """
-    PURE application layer: owns the parking state and returns data (no tkinter).
-    Step 8 keeps the baseline logic (including sentinels & counters) so behavior
-    stays familiar. We’ll improve with Factory/State in Steps 12–15.
+    Step 8–10: Pure application layer with slot ID normalization.
+
+    - Pure Python: no tkinter, returns data structures.
+    - Single source of truth for slot IDs = array index (0-based).
+    - UI-facing numbers are 1-based via helpers _to_ui/_from_ui.
+    - Temporary API shim: leave(..., fuel="ICE") keeps old callers working.
+      (We’ll require explicit fuel after the Factory/State refactor.)
     """
 
-    # -------- lifecycle --------
     def __init__(self, capacity: int, ev_capacity: int, level: int = 1) -> None:
         if capacity < 0 or ev_capacity < 0:
             raise ValueError("capacities must be >= 0")
@@ -60,16 +63,27 @@ class ParkingService:
         self.capacity = capacity
         self.ev_capacity = ev_capacity
 
-        # Baseline representation (kept for now)
+        # Internal representation (kept baseline structures for now)
         self.slots: List[Union[int, Vehicle.Vehicle]] = [-1] * capacity
         self.evSlots: List[Union[int, ElectricVehicle.ElectricVehicle]] = [-1] * ev_capacity
 
-        self.slotid = 0     # baseline's user-facing counter for ICE
-        self.slotEvId = 0   # baseline's user-facing counter for EV
+        # Removed separate user-facing counters; we use indices
         self.numOfOccupiedSlots = 0
         self.numOfOccupiedEvSlots = 0
 
-    # -------- helpers (baseline style) --------
+    # ---------- helpers ----------
+    @staticmethod
+    def _to_ui(idx: int) -> int:
+        """Convert internal 0-based index to 1-based UI slot number."""
+        return idx + 1
+
+    @staticmethod
+    def _from_ui(slot_ui: int) -> Optional[int]:
+        """Convert 1-based UI slot number to internal 0-based index."""
+        if slot_ui <= 0:
+            return None
+        return slot_ui - 1
+
     def _get_empty_slot(self) -> Optional[int]:
         for i, v in enumerate(self.slots):
             if v == -1:
@@ -82,7 +96,7 @@ class ParkingService:
                 return i
         return None
 
-    # -------- API --------
+    # ---------- API ----------
     def park(self, spec: VehicleSpec) -> ParkResult:
         if not spec.regnum.strip():
             return {"ok": False, "message": "registration required", "slot_ui": None}
@@ -90,71 +104,63 @@ class ParkingService:
         is_ev = spec.fuel == "EV"
         is_motor = spec.kind == "MOTORCYCLE"
 
-        # Keep baseline counters/behavior for now
         if is_ev:
             if self.numOfOccupiedEvSlots >= self.ev_capacity:
                 return {"ok": False, "message": "Sorry, EV lot is full", "slot_ui": None}
             idx = self._get_empty_ev_slot()
             if idx is None:
                 return {"ok": False, "message": "Sorry, EV lot is full", "slot_ui": None}
-            # Baseline EV class selection (we’ll centralize later with a Factory)
-            if is_motor:
-                self.evSlots[idx] = ElectricVehicle.ElectricBike(
-                    spec.regnum, spec.make, spec.model, spec.color
-                )
-            else:
-                self.evSlots[idx] = ElectricVehicle.ElectricCar(
-                    spec.regnum, spec.make, spec.model, spec.color
-                )
-            self.slotEvId += 1
+
+            self.evSlots[idx] = (
+                ElectricVehicle.ElectricBike(spec.regnum, spec.make, spec.model, spec.color)
+                if is_motor
+                else ElectricVehicle.ElectricCar(spec.regnum, spec.make, spec.model, spec.color)
+            )
             self.numOfOccupiedEvSlots += 1
-            # Baseline returns a separate counter (not the array index)
-            return {
-                "ok": True,
-                "message": f"Allocated EV slot number: {self.slotEvId}",
-                "slot_ui": self.slotEvId,
-            }
+            ui = self._to_ui(idx)
+            return {"ok": True, "message": f"Allocated EV slot number: {ui}", "slot_ui": ui}
+
+        # ICE
+        if self.numOfOccupiedSlots >= self.capacity:
+            return {"ok": False, "message": "Sorry, parking lot is full", "slot_ui": None}
+        idx = self._get_empty_slot()
+        if idx is None:
+            return {"ok": False, "message": "Sorry, parking lot is full", "slot_ui": None}
+
+        if is_motor:
+            self.slots[idx] = Vehicle.Motorcycle(spec.regnum, spec.make, spec.model, spec.color)
+        elif spec.kind == "TRUCK":
+            self.slots[idx] = Vehicle.Truck(spec.regnum, spec.make, spec.model, spec.color)
+        elif spec.kind == "BUS":
+            self.slots[idx] = Vehicle.Bus(spec.regnum, spec.make, spec.model, spec.color)
         else:
-            if self.numOfOccupiedSlots >= self.capacity:
-                return {"ok": False, "message": "Sorry, parking lot is full", "slot_ui": None}
-            idx = self._get_empty_slot()
-            if idx is None:
-                return {"ok": False, "message": "Sorry, parking lot is full", "slot_ui": None}
-            # Baseline ICE class selection (note: mix-ups exist in original; we’ll fix later)
-            if is_motor:
-                self.slots[idx] = Vehicle.Motorcycle(spec.regnum, spec.make, spec.model, spec.color)
-            elif spec.kind == "TRUCK":
-                self.slots[idx] = Vehicle.Truck(spec.regnum, spec.make, spec.model, spec.color)
-            elif spec.kind == "BUS":
-                self.slots[idx] = Vehicle.Bus(spec.regnum, spec.make, spec.model, spec.color)
-            else:
-                self.slots[idx] = Vehicle.Car(spec.regnum, spec.make, spec.model, spec.color)
-            self.slotid += 1
-            self.numOfOccupiedSlots += 1
-            return {"ok": True, "message": f"Allocated slot number: {self.slotid}", "slot_ui": self.slotid}
+            self.slots[idx] = Vehicle.Car(spec.regnum, spec.make, spec.model, spec.color)
+
+        self.numOfOccupiedSlots += 1
+        ui = self._to_ui(idx)
+        return {"ok": True, "message": f"Allocated slot number: {ui}", "slot_ui": ui}
 
     def leave(self, slot_ui: int, fuel: Fuel = "ICE") -> LeaveResult:
-        if slot_ui <= 0:
+        idx = self._from_ui(slot_ui)
+        if idx is None:
             return {"ok": False, "message": "slot must be >= 1"}
+
         if fuel == "EV":
-            if self.numOfOccupiedEvSlots == 0:
-                return {"ok": False, "message": "No EV vehicles to remove"}
-            # Baseline: interprets UI slot as 1-based into array
-            idx = slot_ui - 1
+            # Check the requested slot first
             if 0 <= idx < len(self.evSlots) and self.evSlots[idx] != -1:
                 self.evSlots[idx] = -1
                 self.numOfOccupiedEvSlots -= 1
                 return {"ok": True, "message": f"EV slot {slot_ui} is free"}
+            # If nothing there, choose a precise error over generic count checks
             return {"ok": False, "message": "Slot empty or invalid"}
-        else:
-            if self.numOfOccupiedSlots == 0:
-                return {"ok": False, "message": "No vehicles to remove"}
-            idx = slot_ui - 1
-            if 0 <= idx < len(self.slots) and self.slots[idx] != -1:
-                self.slots[idx] = -1
-                self.numOfOccupiedSlots -= 1
-                return {"ok": True, "message": f"Slot {slot_ui} is free"}
-            return {"ok": False, "message": "Slot empty or invalid"}
+
+        # ICE
+        if 0 <= idx < len(self.slots) and self.slots[idx] != -1:
+            self.slots[idx] = -1
+            self.numOfOccupiedSlots -= 1
+            return {"ok": True, "message": f"Slot {slot_ui} is free"}
+        return {"ok": False, "message": "Slot empty or invalid"}
+
 
     def status_rows(self) -> list[StatusRow]:
         rows: list[StatusRow] = []
@@ -162,7 +168,7 @@ class ParkingService:
             if v != -1:
                 rows.append(
                     {
-                        "slot_ui": i + 1,
+                        "slot_ui": self._to_ui(i),
                         "level": self.level,
                         "regnum": v.regnum,
                         "color": v.color,
@@ -178,7 +184,7 @@ class ParkingService:
             if v != -1:
                 rows.append(
                     {
-                        "slot_ui": i + 1,
+                        "slot_ui": self._to_ui(i),
                         "level": self.level,
                         "regnum": v.regnum,
                         "color": v.color,
@@ -192,5 +198,12 @@ class ParkingService:
         rows: list[dict] = []
         for i, v in enumerate(self.evSlots):
             if v != -1:
-                rows.append({"slot_ui": i + 1, "level": self.level, "regnum": v.regnum, "charge": v.charge})
+                rows.append(
+                    {
+                        "slot_ui": self._to_ui(i),
+                        "level": self.level,
+                        "regnum": v.regnum,
+                        "charge": v.charge,
+                    }
+                )
         return rows
