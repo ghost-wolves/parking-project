@@ -6,9 +6,12 @@ requires-python = ">=3.10"
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+# keep non-lint things here (e.g., formatting later)
+
+[tool.ruff.lint]
 select = ["E","F","I","UP","B","SIM"]
-ignore = ["E501"]  # we'll handle long lines later
-exclude = ["docs/"]
+ignore = ["E501"]           # we’ll deal with long lines later
+exclude = ["docs/"]         # paths Ruff should skip
 
 [tool.mypy]
 python_version = "3.10"

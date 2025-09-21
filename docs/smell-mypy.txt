@@ -1,0 +1,5 @@
+src\ParkingManager.py:8: error: No overload variant matches argument types "int", "int"  [call-overload]
+src\ParkingManager.py:8: note: Possible overload variants:
+src\ParkingManager.py:8: note:     def (width: None = ..., height: None = ...) -> tuple[bool, bool]
+src\ParkingManager.py:8: note:     def (width: bool, height: bool) -> None
+Found 1 error in 1 file (checked 4 source files)

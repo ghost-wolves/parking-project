@@ -1,0 +1,92 @@
+I001 [*] Import block is un-sorted or un-formatted
+ --> src\ParkingManager.py:1:1
+  |
+1 | / import Vehicle
+2 | | import ElectricVehicle
+3 | | import sys
+4 | | import tkinter as tk
+  | |____________________^
+5 |
+6 |   root = tk.Tk()
+  |
+help: Organize imports
+
+F401 [*] `sys` imported but unused
+ --> src\ParkingManager.py:3:8
+  |
+1 | import Vehicle
+2 | import ElectricVehicle
+3 | import sys
+  |        ^^^
+4 | import tkinter as tk
+  |
+help: Remove unused import: `sys`
+
+F821 Undefined name `make`
+   --> src\ParkingManager.py:234:40
+    |
+232 |             if self.evSlots[i] == -1:
+233 |                 continue
+234 |             if self.evSlots[i].make == make:
+    |                                        ^^^^
+235 |                 slotnums.append(str(i+1))
+236 |         return slotnums
+    |
+
+F821 Undefined name `model`
+   --> src\ParkingManager.py:244:41
+    |
+242 |             if self.evSlots[i] == -1:
+243 |                 continue
+244 |             if self.evSlots[i].model == model:
+    |                                         ^^^^^
+245 |                 slotnums.append(str(i+1))
+246 |         return slotnums
+    |
+
+F841 Local variable `res` is assigned to but never used
+   --> src\ParkingManager.py:279:9
+    |
+278 |     def makeLot(self):
+279 |         res = self.createParkingLot(int(num_value.get()),int(ev_value.get()),int(level_value.get()),)
+    |         ^^^
+280 |         output = 'Created a parking lot with '+num_value.get()+' regular slots and '+ev_value.get()+' ev slots on level: '+level_valu…
+281 |         tfield.insert(tk.INSERT, output)
+    |
+help: Remove assignment to unused variable `res`
+
+E401 [*] Multiple imports on one line
+ --> tests\conftest.py:2:1
+  |
+1 | # tests/conftest.py
+2 | import sys, os
+  | ^^^^^^^^^^^^^^
+3 | # Add the project root (where src/ lives) to sys.path
+4 | PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+  |
+help: Split imports
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests\conftest.py:2:1
+  |
+1 | # tests/conftest.py
+2 | import sys, os
+  | ^^^^^^^^^^^^^^
+3 | # Add the project root (where src/ lives) to sys.path
+4 | PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+  |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests\test_smoke.py:2:1
+  |
+1 | # tests/test_smoke.py
+2 | import importlib
+  | ^^^^^^^^^^^^^^^^
+3 |
+4 | def test_imports():
+  |
+help: Organize imports
+
+Found 8 errors.
+[*] 5 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
