@@ -5,6 +5,7 @@ from typing import Optional, Literal, TypedDict, List, Union
 
 import Vehicle
 import ElectricVehicle
+from vehicle_factory import create as create_vehicle  # <-- Factory integration
 
 Fuel = Literal["ICE", "EV"]
 Kind = Literal["CAR", "MOTORCYCLE", "BUS", "TRUCK"]  # mirrors current classes
@@ -42,11 +43,12 @@ class StatusRow(TypedDict):
 
 class ParkingService:
     """
-    Step 8–10: Pure application layer with slot ID normalization.
+    Pure application layer with slot ID normalization and factory-based creation.
 
     - Pure Python: no tkinter, returns data structures.
     - Single source of truth for slot IDs = array index (0-based).
     - UI-facing numbers are 1-based via helpers _to_ui/_from_ui.
+    - Uses VehicleFactory for all object construction.
     - Temporary API shim: leave(..., fuel="ICE") keeps old callers working.
       (We’ll require explicit fuel after the Factory/State refactor.)
     """
@@ -67,7 +69,7 @@ class ParkingService:
         self.slots: List[Union[int, Vehicle.Vehicle]] = [-1] * capacity
         self.evSlots: List[Union[int, ElectricVehicle.ElectricVehicle]] = [-1] * ev_capacity
 
-        # Removed separate user-facing counters; we use indices
+        # No separate user-facing counters; we use indices
         self.numOfOccupiedSlots = 0
         self.numOfOccupiedEvSlots = 0
 
@@ -101,57 +103,50 @@ class ParkingService:
         if not spec.regnum.strip():
             return {"ok": False, "message": "registration required", "slot_ui": None}
 
-        is_ev = spec.fuel == "EV"
-        is_motor = spec.kind == "MOTORCYCLE"
-
-        if is_ev:
+        if spec.fuel == "EV":
             if self.numOfOccupiedEvSlots >= self.ev_capacity:
                 return {"ok": False, "message": "Sorry, EV lot is full", "slot_ui": None}
             idx = self._get_empty_ev_slot()
             if idx is None:
                 return {"ok": False, "message": "Sorry, EV lot is full", "slot_ui": None}
 
-            self.evSlots[idx] = (
-                ElectricVehicle.ElectricBike(spec.regnum, spec.make, spec.model, spec.color)
-                if is_motor
-                else ElectricVehicle.ElectricCar(spec.regnum, spec.make, spec.model, spec.color)
+            # Factory creates the correct EV class
+            entity = create_vehicle(
+                spec.regnum, spec.make, spec.model, spec.color, spec.fuel, spec.kind
             )
+            self.evSlots[idx] = entity
             self.numOfOccupiedEvSlots += 1
             ui = self._to_ui(idx)
             return {"ok": True, "message": f"Allocated EV slot number: {ui}", "slot_ui": ui}
 
-        # ICE
+        # ICE branch
         if self.numOfOccupiedSlots >= self.capacity:
             return {"ok": False, "message": "Sorry, parking lot is full", "slot_ui": None}
         idx = self._get_empty_slot()
         if idx is None:
             return {"ok": False, "message": "Sorry, parking lot is full", "slot_ui": None}
 
-        if is_motor:
-            self.slots[idx] = Vehicle.Motorcycle(spec.regnum, spec.make, spec.model, spec.color)
-        elif spec.kind == "TRUCK":
-            self.slots[idx] = Vehicle.Truck(spec.regnum, spec.make, spec.model, spec.color)
-        elif spec.kind == "BUS":
-            self.slots[idx] = Vehicle.Bus(spec.regnum, spec.make, spec.model, spec.color)
-        else:
-            self.slots[idx] = Vehicle.Car(spec.regnum, spec.make, spec.model, spec.color)
-
+        # Factory creates the correct ICE class
+        entity = create_vehicle(
+            spec.regnum, spec.make, spec.model, spec.color, spec.fuel, spec.kind
+        )
+        self.slots[idx] = entity
         self.numOfOccupiedSlots += 1
         ui = self._to_ui(idx)
         return {"ok": True, "message": f"Allocated slot number: {ui}", "slot_ui": ui}
 
     def leave(self, slot_ui: int, fuel: Fuel = "ICE") -> LeaveResult:
+        """Temporary default for fuel keeps older callers working."""
         idx = self._from_ui(slot_ui)
         if idx is None:
             return {"ok": False, "message": "slot must be >= 1"}
 
         if fuel == "EV":
-            # Check the requested slot first
+            # Validate the requested slot first for precise feedback
             if 0 <= idx < len(self.evSlots) and self.evSlots[idx] != -1:
                 self.evSlots[idx] = -1
                 self.numOfOccupiedEvSlots -= 1
                 return {"ok": True, "message": f"EV slot {slot_ui} is free"}
-            # If nothing there, choose a precise error over generic count checks
             return {"ok": False, "message": "Slot empty or invalid"}
 
         # ICE
@@ -160,7 +155,6 @@ class ParkingService:
             self.numOfOccupiedSlots -= 1
             return {"ok": True, "message": f"Slot {slot_ui} is free"}
         return {"ok": False, "message": "Slot empty or invalid"}
-
 
     def status_rows(self) -> list[StatusRow]:
         rows: list[StatusRow] = []
@@ -208,9 +202,9 @@ class ParkingService:
                 )
         return rows
 
-        # -------- EV finders (fixed) --------
+    # -------- EV finders (fixed) --------
     def ev_slots_by_make(self, make: str) -> list[int]:
-        """Return 1-based UI slot numbers for EVs that match the given make."""
+        """Return 1-based UI slot numbers for EVs matching the given make."""
         out: list[int] = []
         m = (make or "").strip()
         if not m:
@@ -221,7 +215,7 @@ class ParkingService:
         return out
 
     def ev_slots_by_model(self, model: str) -> list[int]:
-        """Return 1-based UI slot numbers for EVs that match the given model."""
+        """Return 1-based UI slot numbers for EVs matching the given model."""
         out: list[int] = []
         md = (model or "").strip()
         if not md:
@@ -230,3 +224,52 @@ class ParkingService:
             if v != -1 and str(v.model) == md:
                 out.append(self._to_ui(i))
         return out
+
+    # -------- ICE finders --------
+    def slots_by_make(self, make: str) -> list[int]:
+        out: list[int] = []
+        m = (make or "").strip()
+        if not m:
+            return out
+        for i, v in enumerate(self.slots):
+            if v != -1 and str(v.make) == m:
+                out.append(self._to_ui(i))
+        return out
+
+    def slots_by_model(self, model: str) -> list[int]:
+        out: list[int] = []
+        md = (model or "").strip()
+        if not md:
+            return out
+        for i, v in enumerate(self.slots):
+            if v != -1 and str(v.model) == md:
+                out.append(self._to_ui(i))
+        return out
+
+    # -------- Cross-cutting finders --------
+    def all_slots_by_color(self, color: str) -> list[int]:
+        """Return 1-based slot numbers for any vehicle (ICE or EV) matching color."""
+        out: list[int] = []
+        c = (color or "").strip()
+        if not c:
+            return out
+        for i, v in enumerate(self.slots):
+            if v != -1 and str(v.color) == c:
+                out.append(self._to_ui(i))
+        for i, v in enumerate(self.evSlots):
+            if v != -1 and str(v.color) == c:
+                out.append(self._to_ui(i))
+        return out
+
+    def all_regnums_by_color(self, color: str) -> list[str]:
+        regs: list[str] = []
+        c = (color or "").strip()
+        if not c:
+            return regs
+        for v in self.slots:
+            if v != -1 and str(v.color) == c:
+                regs.append(str(v.regnum))
+        for v in self.evSlots:
+            if v != -1 and str(v.color) == c:
+                regs.append(str(v.regnum))
+        return regs
