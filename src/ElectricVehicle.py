@@ -1,40 +1,27 @@
+# src/ElectricVehicle.py
 
 class ElectricVehicle:
-    def __init__(self,regnum,make,model,color):
-        self.color = color
+    def __init__(self, regnum, make, model, color):
         self.regnum = regnum
         self.make = make
         self.model = model
+        self.color = color
         self.charge = 0
 
-    def getMake(self):
-        return self.make
+    def getType(self):
+        return "ElectricVehicle"
 
-    def getModel(self):
-        return self.model
-
-    def getColor(self):
-        return self.color
-
-    def getRegNum(self):
-        return self.regnum
-
-    def setCharge(self, charge):
-        self.charge = charge
-
-    def getCharge(self):
-        return self.charge
-
-class ElectricCar:
-    def __init__(self,regnum,make,model,color):
-        ElectricVehicle.__init__(self,regnum,make,model,color)
+# ✅ FIXED: now inherit from ElectricVehicle
+class ElectricCar(ElectricVehicle):
+    def __init__(self, regnum, make, model, color):
+        super().__init__(regnum, make, model, color)
 
     def getType(self):
-        return "Car"
+        return "Car"   # keep baseline behavior for now
 
-class ElectricBike:
-    def __init__(self,regnum,make,model,color):
-        ElectricVehicle.__init__(self,regnum,make,model,color)
+class ElectricBike(ElectricVehicle):
+    def __init__(self, regnum, make, model, color):
+        super().__init__(regnum, make, model, color)
 
     def getType(self):
-        return "Motorcycle"
+        return "Motorcycle"  # baseline behavior
