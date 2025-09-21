@@ -1,5 +1,6 @@
 from src.parking_service import ParkingService, VehicleSpec
 
+
 def test_ice_finders_by_make_model_and_color():
     svc = ParkingService(capacity=3, ev_capacity=1, level=1)
     svc.park(VehicleSpec("R1","Honda","Civic","Blue",  "ICE","CAR"))

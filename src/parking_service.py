@@ -1,18 +1,18 @@
-# src/parking_service.py
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import Optional, Literal, TypedDict, List
 
-import Vehicle
-import ElectricVehicle
-from vehicle_factory import create as create_vehicle
+from dataclasses import dataclass
+from typing import Any, Literal, TypedDict
+
 from slot import Slot
+from vehicle_factory import create as create_vehicle
 
 Fuel = Literal["ICE", "EV"]
 Kind = Literal["CAR", "MOTORCYCLE", "BUS", "TRUCK"]
 
+
 @dataclass(frozen=True)
 class VehicleSpec:
+    """Specification used to construct a vehicle through the factory."""
     regnum: str
     make: str
     model: str
@@ -20,14 +20,17 @@ class VehicleSpec:
     fuel: Fuel
     kind: Kind
 
+
 class ParkResult(TypedDict):
     ok: bool
     message: str
-    slot_ui: Optional[int]
+    slot_ui: int | None  # 1-based index for UI
+
 
 class LeaveResult(TypedDict):
     ok: bool
     message: str
+
 
 class StatusRow(TypedDict):
     slot_ui: int
@@ -37,12 +40,15 @@ class StatusRow(TypedDict):
     make: str
     model: str
 
+
 class ParkingService:
     """
-    Pure application layer with Slot state model.
-    - Internal truth: list[Slot] for ICE and EV (no more -1 sentinels).
-    - UI-facing numbers are 1-based via _to_ui/_from_ui.
-    - Vehicle construction centralized in vehicle_factory.
+    Pure application layer for the Parking Lot.
+    - Uses Slot state objects (no '-1' sentinels).
+    - Vehicle construction is centralized via vehicle_factory.
+    - Slot IDs are normalized: 0-based internally, 1-based for UI/messages.
+    - Temporary API shim: leave(..., fuel="ICE") remains for back-compat and
+      should be made required after the Factory/State milestones.
     """
 
     def __init__(self, capacity: int, ev_capacity: int, level: int = 1) -> None:
@@ -58,27 +64,32 @@ class ParkingService:
         self.ev_capacity = ev_capacity
 
         # State-model slots
-        self.slots: List[Slot]   = [Slot(i, level, "ICE") for i in range(capacity)]
-        self.evSlots: List[Slot] = [Slot(i, level, "EV")  for i in range(ev_capacity)]
+        self.slots: list[Slot] = [Slot(i, level, "ICE") for i in range(capacity)]
+        self.evSlots: list[Slot] = [Slot(i, level, "EV") for i in range(ev_capacity)]
+
 
     # ---------- helpers ----------
     @staticmethod
     def _to_ui(idx: int) -> int:
+        """Convert internal 0-based index to 1-based UI slot number."""
         return idx + 1
 
     @staticmethod
-    def _from_ui(slot_ui: int) -> Optional[int]:
+    def _from_ui(slot_ui: int) -> int | None:
+        """Convert 1-based UI slot number to internal 0-based index (validated)."""
         if slot_ui <= 0:
             return None
         return slot_ui - 1
 
-    def _get_empty_slot(self) -> Optional[int]:
+    def _get_empty_slot(self) -> int | None:
+        """Return first vacant ICE slot index, else None."""
         for i, s in enumerate(self.slots):
             if s.is_vacant:
                 return i
         return None
 
-    def _get_empty_ev_slot(self) -> Optional[int]:
+    def _get_empty_ev_slot(self) -> int | None:
+        """Return first vacant EV slot index, else None."""
         for i, s in enumerate(self.evSlots):
             if s.is_vacant:
                 return i
@@ -86,7 +97,17 @@ class ParkingService:
 
     # ---------- API ----------
     def park(self, spec: VehicleSpec) -> ParkResult:
-        if not spec.regnum.strip():
+        """Park a vehicle. Returns ok/message and 1-based slot if successful."""
+        # minimal sanitize: trim strings so lookups behave predictably
+        spec = VehicleSpec(
+            regnum=spec.regnum.strip(),
+            make=spec.make.strip(),
+            model=spec.model.strip(),
+            color=spec.color.strip(),
+            fuel=spec.fuel,
+            kind=spec.kind,
+        )
+        if not spec.regnum:
             return {"ok": False, "message": "registration required", "slot_ui": None}
 
         if spec.fuel == "EV":
@@ -108,6 +129,10 @@ class ParkingService:
         return {"ok": True, "message": f"Allocated slot number: {ui}", "slot_ui": ui}
 
     def leave(self, slot_ui: int, fuel: Fuel = "ICE") -> LeaveResult:
+        """
+        Free a slot by its 1-based UI number.
+        NOTE: 'fuel' is temporarily optional for back-compat; pass explicitly where possible.
+        """
         idx = self._from_ui(slot_ui)
         if idx is None:
             return {"ok": False, "message": "slot must be >= 1"}
@@ -126,6 +151,7 @@ class ParkingService:
 
     # ---------- Reporting ----------
     def status_rows(self) -> list[StatusRow]:
+        """Tabular rows for ICE vehicles currently parked."""
         rows: list[StatusRow] = []
         for i, s in enumerate(self.slots):
             v = s.vehicle
@@ -143,6 +169,7 @@ class ParkingService:
         return rows
 
     def ev_status_rows(self) -> list[StatusRow]:
+        """Tabular rows for EV vehicles currently parked."""
         rows: list[StatusRow] = []
         for i, s in enumerate(self.evSlots):
             v = s.vehicle
@@ -159,8 +186,9 @@ class ParkingService:
                 )
         return rows
 
-    def ev_charge_rows(self) -> list[dict]:
-        rows: list[dict] = []
+    def ev_charge_rows(self) -> list[dict[str, Any]]:
+        """Rows for EV charge status (slot, level, reg, charge%)."""
+        rows: list[dict[str, Any]] = []
         for i, s in enumerate(self.evSlots):
             v = s.vehicle
             if v is not None:
@@ -176,6 +204,7 @@ class ParkingService:
 
     # ---------- Finders ----------
     def ev_slots_by_make(self, make: str) -> list[int]:
+        """Return 1-based EV slot numbers where vehicle.make == make."""
         out: list[int] = []
         m = (make or "").strip()
         if not m:
@@ -187,6 +216,7 @@ class ParkingService:
         return out
 
     def ev_slots_by_model(self, model: str) -> list[int]:
+        """Return 1-based EV slot numbers where vehicle.model == model."""
         out: list[int] = []
         md = (model or "").strip()
         if not md:
@@ -198,6 +228,7 @@ class ParkingService:
         return out
 
     def slots_by_make(self, make: str) -> list[int]:
+        """Return 1-based ICE slot numbers where vehicle.make == make."""
         out: list[int] = []
         m = (make or "").strip()
         if not m:
@@ -209,6 +240,7 @@ class ParkingService:
         return out
 
     def slots_by_model(self, model: str) -> list[int]:
+        """Return 1-based ICE slot numbers where vehicle.model == model."""
         out: list[int] = []
         md = (model or "").strip()
         if not md:
@@ -220,6 +252,7 @@ class ParkingService:
         return out
 
     def all_slots_by_color(self, color: str) -> list[int]:
+        """Return 1-based slot numbers (ICE+EV) where vehicle.color == color."""
         out: list[int] = []
         c = (color or "").strip()
         if not c:
@@ -235,6 +268,7 @@ class ParkingService:
         return out
 
     def all_regnums_by_color(self, color: str) -> list[str]:
+        """Return registration numbers (ICE+EV) where vehicle.color == color."""
         regs: list[str] = []
         c = (color or "").strip()
         if not c:

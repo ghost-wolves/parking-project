@@ -1,6 +1,7 @@
 # tests/test_parking_service_roundtrip.py
 from src.parking_service import ParkingService, VehicleSpec
 
+
 def test_roundtrip_park_leave_ice():
     svc = ParkingService(2, 1, 1)
     r = svc.park(VehicleSpec("R1", "Honda", "Civic", "Blue", fuel="ICE", kind="CAR"))

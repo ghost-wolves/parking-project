@@ -1,5 +1,7 @@
 import importlib
-import pytest # type: ignore
+
+from src.parking_service import ParkingService, VehicleSpec
+
 
 def import_src(mod: str):
     return importlib.import_module(mod)
@@ -11,7 +13,6 @@ def test_ev_subclass_relationship_fixed():
     assert isinstance(ecar, EV.ElectricVehicle)
     assert isinstance(ebike, EV.ElectricVehicle)
 
-from src.parking_service import ParkingService, VehicleSpec
 
 def test_ev_finders_by_make_and_model():
     svc = ParkingService(capacity=0, ev_capacity=3, level=1)

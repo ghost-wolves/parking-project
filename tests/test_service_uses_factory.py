@@ -1,7 +1,9 @@
 # tests/test_service_uses_factory.py
-from src.parking_service import ParkingService, VehicleSpec
+# tests/test_service_uses_factory.py
 import ElectricVehicle as EV
 import Vehicle as V
+from src.parking_service import ParkingService, VehicleSpec
+
 
 def test_service_parks_ev_bike_via_factory():
     svc = ParkingService(2, 2, 1)

@@ -1,6 +1,8 @@
-import pytest # type: ignore
-from src.vehicle_factory import create
 import importlib
+
+import pytest  # type: ignore
+
+from src.vehicle_factory import create
 
 EV = importlib.import_module("ElectricVehicle")
 V = importlib.import_module("Vehicle")

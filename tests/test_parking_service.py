@@ -1,8 +1,9 @@
 from src.parking_service import ParkingService, VehicleSpec
 
+
 def test_service_constructs_and_validates_sizes():
     svc = ParkingService(capacity=5, ev_capacity=2, level=1)
-    assert svc.capacity == 5 and svc.ev_capacity == 2 and svc.level == 1
+    assert svc.capacity == 5 and svc.ev_capacity == 2 and svc.level == 1 # noqa: PLR2004
 
 def test_service_rejects_bad_sizes():
     for args in [
