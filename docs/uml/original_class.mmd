@@ -1,0 +1,69 @@
+classDiagram
+    %% === UI / App Bootstrap (Tkinter coupled) ===
+    class ParkingManagerUI {
+      - root: Tk
+      - inputs: StringVar[*]
+      - tfield: Text
+      + build_ui()
+      + on_park_click()
+      + on_leave_click()
+      + status(msg)
+    }
+
+    %% === Domain (in same module as UI) ===
+    class ParkingLot {
+      - level: int
+      - slots: list        %% non-EV slots
+      - evSlots: list      %% EV slots
+      - slotid: int        %% separate counter
+      - slotEvId: int      %% separate counter
+      + park(...)
+      + leave(slotId: int)
+      + getEmptySlot(): int
+      + getEmptySlotEv(): int
+      + getSlotNumFromColor(color): int
+      + getSlotNumFromMakeEv(make): int    %% buggy in code today
+      + getSlotNumFromModelEv(model): int  %% buggy in code today
+      + status(msg)                         %% writes to UI Text
+    }
+
+    %% === ICE vehicles ===
+    class Vehicle {
+      - regnum: str
+      - make: str
+      - model: str
+      - color: str
+      + getType(): str
+    }
+    class Car
+    class Truck
+    class Bus
+    class Motorcycle
+    Vehicle <|-- Car
+    Vehicle <|-- Truck
+    Vehicle <|-- Bus
+    Vehicle <|-- Motorcycle
+
+    %% === EV vehicles (note: no actual inheritance in baseline) ===
+    class ElectricVehicle {
+      - regnum: str
+      - make: str
+      - model: str
+      - color: str
+      - charge: int
+      + getType(): str
+    }
+    class ElectricCar {
+      + __init__(regnum, make, model, color)
+      %% calls ElectricVehicle.__init__ manually
+    }
+    class ElectricBike {
+      + __init__(regnum, make, model, color)
+      %% calls ElectricVehicle.__init__ manually
+    }
+
+    %% Relationships (baseline reality)
+    ParkingManagerUI --> ParkingLot : calls methods / shares globals
+    ParkingLot ..> Vehicle : instantiates
+    ParkingLot ..> ElectricVehicle : instantiates
+    %% EV bug: ElectricCar/ElectricBike do NOT inherit in code

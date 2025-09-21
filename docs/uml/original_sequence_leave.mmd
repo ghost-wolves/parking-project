@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant User
+    participant UI as ParkingManagerUI (Tk)
+    participant Lot as ParkingLot
+
+    User->>UI: Enter slot number, click "Leave"
+    UI->>Lot: leave(slotIdFromUI)
+    activate Lot
+    Note over Lot: slotid/slotEvId counters vs array index may diverge
+    alt slot is occupied
+        Lot-->>UI: status("Vehicle with reg ... left slot ...")
+        Lot->>Lot: set array index to -1
+    else invalid/empty
+        Lot-->>UI: status("Slot empty or invalid")
+    end
+    deactivate Lot

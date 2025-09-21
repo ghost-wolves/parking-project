@@ -1,0 +1,27 @@
+sequenceDiagram
+    participant User
+    participant UI as ParkingManagerUI (Tk)
+    participant Lot as ParkingLot
+    participant V as Vehicle/ElectricVehicle
+
+    User->>UI: Click "Park"
+    UI->>Lot: park(evFlag, motorFlag, make, model, color, reg, charge?)
+    activate Lot
+    alt evFlag == true
+        Lot->>Lot: getEmptySlotEv()  %% scans for -1
+        alt found index >= 0
+            Lot->>V: construct EV class via nested ifs\n(ElectricCar/ElectricBike)
+            Lot-->>UI: status("Parked EV at slot ...")\n(writes Text widget)
+        else none
+            Lot-->>UI: status("No empty EV slots")
+        end
+    else non-EV
+        Lot->>Lot: getEmptySlot()  %% scans for -1
+        alt found index >= 0
+            Lot->>V: construct ICE class via nested ifs\n(Car/Motorcycle/Bus/Truck)
+            Lot-->>UI: status("Parked at slot ...")
+        else none
+            Lot-->>UI: status("No empty slots")
+        end
+    end
+    deactivate Lot
