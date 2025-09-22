@@ -478,6 +478,7 @@ def main() -> None:  # noqa: PLR0915
     build_lookup_buttons(root, lookupSlotByReg, lookupSlotByColor, lookupRegByColor)
     build_status_section(root, tfield, showChargeStatus, showStatus)
     build_persistence_buttons(root, saveJson, loadJson, exportCsv)
+    root.geometry("650x980")  # was 650x900
 
     root.mainloop()
 
