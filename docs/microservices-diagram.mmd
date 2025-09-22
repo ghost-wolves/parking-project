@@ -1,0 +1,53 @@
+```mermaid
+flowchart LR
+  %% Microservices and data ownership
+
+  subgraph Parking[parking-svc]
+    PDB[(Postgres: lots/slots)]
+    PAPI[/Park/Leave API/]
+    PEVT>VehicleParked/Left]
+  end
+
+  subgraph Charging[charging-svc]
+    CDB[(Postgres: chargers/sessions)]
+    CAPI[/Sessions API/]
+    CEVT>SessionStarted/Closed]
+  end
+
+  subgraph Billing[billing-svc]
+    BDB[(Postgres: invoices/payments)]
+    BAPI[/Billing API/]
+    BEVT>InvoicePaid/Failed]
+  end
+
+  subgraph Accounts[accounts-svc]
+    ADB[(Postgres: customers/vehicles)]
+    AAPI[/Auth & Accounts API/]
+  end
+
+  subgraph Ops[ops-svc]
+    TDB[(TS DB: telemetry)]
+    TAPI[/Metrics API/]
+    TEVT>Alerts]
+  end
+
+  %% API flows
+  AAPI -- JWT/OIDC --> PAPI
+  AAPI -- JWT/OIDC --> CAPI
+  AAPI -- JWT/OIDC --> BAPI
+
+  %% Event flows
+  PEVT -- correlate --> CDB
+  CEVT -- pricing via ACL --> BDB
+  PEVT -- parking lines (opt) --> BDB
+  PEVT -- occupancy --> TDB
+  CEVT -- availability --> TDB
+
+  %% User
+  U[(Clients/UI/CLI)]
+  U --> PAPI
+  U --> CAPI
+  U --> BAPI
+  U --> AAPI
+  U --> TAPI
+```
