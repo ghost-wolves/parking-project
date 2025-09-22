@@ -1,0 +1,28 @@
+sequenceDiagram
+    actor UI as ParkingManager (Tk)
+    participant S as ParkingService
+    participant F as VehicleFactory
+    participant SL as Slot
+
+    UI->>S: park(spec: VehicleSpec)
+    alt spec.fuel == "EV"
+        S->>S: idx = _get_empty_ev_slot()
+        alt idx is None
+            S-->>UI: { ok: False, message: "EV lot is full" }
+        else
+            S->>F: create(..., fuel="EV", kind=...)
+            F-->>S: ElectricCar|ElectricBike
+            S->>SL: evSlots[idx].occupy(vehicle)
+            S-->>UI: { ok: True, slot_ui: idx+1, message: "Allocated EV slot..." }
+        end
+    else ICE
+        S->>S: idx = _get_empty_slot()
+        alt idx is None
+            S-->>UI: { ok: False, message: "parking lot is full" }
+        else
+            S->>F: create(..., fuel="ICE", kind=...)
+            F-->>S: Car|Truck|Bus|Motorcycle
+            S->>SL: slots[idx].occupy(vehicle)
+            S-->>UI: { ok: True, slot_ui: idx+1, message: "Allocated slot..." }
+        end
+    end

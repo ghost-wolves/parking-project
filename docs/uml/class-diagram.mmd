@@ -1,0 +1,86 @@
+classDiagram
+    direction LR
+
+    class ParkingService {
+      - level: int
+      - capacity: int
+      - ev_capacity: int
+      - slots: list~Slot~
+      - evSlots: list~Slot~
+      + park(spec: VehicleSpec) ParkResult
+      + leave(slot_ui: int, fuel: "ICE"|"EV") LeaveResult
+      + status_rows() list~StatusRow~
+      + ev_status_rows() list~StatusRow~
+      + ev_charge_rows() list~dict~
+      + slots_by_make(make: str) list~int~
+      + slots_by_model(model: str) list~int~
+      + ev_slots_by_make(make: str) list~int~
+      + ev_slots_by_model(model: str) list~int~
+      + all_slots_by_color(color: str) list~int~
+      + all_regnums_by_color(color: str) list~str~
+      - _get_empty_slot() int|None
+      - _get_empty_ev_slot() int|None
+      - _to_ui(idx: int) int
+      - _from_ui(slot_ui: int) int|None
+    }
+
+    class VehicleSpec {
+      + regnum: str
+      + make: str
+      + model: str
+      + color: str
+      + fuel: "ICE"|"EV"
+      + kind: "CAR"|"MOTORCYCLE"|"BUS"|"TRUCK"
+    }
+
+    class Slot {
+      + index: int
+      + level: int
+      + fuel: "ICE"|"EV"
+      - vehicle: Vehicle|ElectricVehicle|None
+      + is_vacant: bool
+      + occupy(v: any) void
+      + free() void
+    }
+
+    class VehicleFactory {
+      + create(regnum, make, model, color, fuel, kind) any
+    }
+
+    class Vehicle {
+      + regnum: str
+      + make: str
+      + model: str
+      + color: str
+      + getType() str
+    }
+
+    class Car
+    class Truck
+    class Bus
+    class Motorcycle
+
+    class ElectricVehicle {
+      + regnum: str
+      + make: str
+      + model: str
+      + color: str
+      + charge: int
+      + getType() str
+    }
+
+    class ElectricCar
+    class ElectricBike
+
+    ParkingService "1" o-- "*" Slot : manages
+    ParkingService ..> VehicleFactory : uses
+    VehicleFactory ..> Vehicle : returns subclass
+    VehicleFactory ..> ElectricVehicle : returns subclass
+
+    Vehicle <|-- Car
+    Vehicle <|-- Truck
+    Vehicle <|-- Bus
+    Vehicle <|-- Motorcycle
+
+    ElectricVehicle <|-- ElectricCar
+    ElectricVehicle <|-- ElectricBike
