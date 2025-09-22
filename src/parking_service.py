@@ -282,3 +282,25 @@ class ParkingService:
             if v is not None and str(v.color) == c:
                 regs.append(str(v.regnum))
         return regs
+        # --- Registration finders (ICE + EV) ---
+    def all_slots_by_reg(self, regnum: str) -> list[int]:
+        """Return 1-based slot numbers for any vehicle whose regnum matches (ICE+EV)."""
+        out: list[int] = []
+        r = (regnum or "").strip()
+        if not r:
+            return out
+        for i, s in enumerate(self.slots):
+            v = s.vehicle
+            if v is not None and str(v.regnum) == r:
+                out.append(self._to_ui(i))
+        for i, s in enumerate(self.evSlots):
+            v = s.vehicle
+            if v is not None and str(v.regnum) == r:
+                out.append(self._to_ui(i))
+        return out
+
+    def first_slot_by_reg(self, regnum: str) -> int | None:
+        """Return the first matching 1-based slot number, or None."""
+        slots = self.all_slots_by_reg(regnum)
+        return slots[0] if slots else None
+

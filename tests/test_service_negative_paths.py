@@ -1,4 +1,4 @@
-import pytest
+import pytest  # type: ignore
 
 from src.parking_service import ParkingService, VehicleSpec
 

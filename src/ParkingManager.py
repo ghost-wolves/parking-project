@@ -145,11 +145,17 @@ def build_remove_section(
     ).grid(column=0, row=11, padx=4, pady=4, sticky="w")
 
 
-def build_lookup_buttons(root: tk.Tk, on_missing: Callable[[str], None]) -> None:
+def build_lookup_buttons(
+    root: tk.Tk,
+    on_slot_by_reg: Callable[[], None],
+    on_slot_by_color: Callable[[], None],
+    on_reg_by_color: Callable[[], None],
+) -> None:
     tk.Label(root, text="", font="Arial 10").grid(row=12, column=0)  # spacer
+
     tk.Button(
         root,
-        command=lambda: on_missing("Get Slot ID by Registration #"),
+        command=on_slot_by_reg,
         text="Get Slot ID by Registration #",
         font="Arial 11",
         bg="lightblue",
@@ -161,7 +167,7 @@ def build_lookup_buttons(root: tk.Tk, on_missing: Callable[[str], None]) -> None
 
     tk.Button(
         root,
-        command=lambda: on_missing("Get Slot ID by Color"),
+        command=on_slot_by_color,
         text="Get Slot ID by Color",
         font="Arial 11",
         bg="lightblue",
@@ -173,7 +179,7 @@ def build_lookup_buttons(root: tk.Tk, on_missing: Callable[[str], None]) -> None
 
     tk.Button(
         root,
-        command=lambda: on_missing("Get Registration # by Color"),
+        command=on_reg_by_color,
         text="Get Registration # by Color",
         font="Arial 11",
         bg="lightblue",
@@ -310,8 +316,59 @@ def main() -> None:  # noqa: PLR0915
         for r in svc.ev_charge_rows():
             write(f"{r['slot_ui']}\t{r['level']}\t{r['regnum']}\t\t{r['charge']}")
 
-    def notImplementedYet(action: str) -> None:
-        write(f"{action} is not implemented yet in this step.")
+    # --------- Step 17: wired lookup handlers (no service changes required) ---------
+    def lookupSlotByReg() -> None:
+        """Find slot(s) for the reg number currently in the Registration field."""
+        if svc is None:
+            write("Please create the parking lot first.")
+            return
+        reg = reg_value.get().strip()
+        if not reg:
+            write("Enter a registration number in the form above, then click the button.")
+            return
+
+        # Use status tables (works with current service API) :contentReference[oaicite:1]{index=1}
+        slots: list[int] = []
+        for row in svc.status_rows():
+            if row["regnum"] == reg:
+                slots.append(row["slot_ui"])
+        for row in svc.ev_status_rows():
+            if row["regnum"] == reg:
+                slots.append(row["slot_ui"])
+
+        if slots:
+            write(f"Registration {reg} found in slot(s): {', '.join(map(str, slots))}")
+        else:
+            write(f"No slot found for registration {reg}")
+
+    def lookupSlotByColor() -> None:
+        if svc is None:
+            write("Please create the parking lot first.")
+            return
+        color = color_value.get().strip()
+        if not color:
+            write("Enter a color in the form above, then click the button.")
+            return
+        # Uses service finder (returns 1-based slots) :contentReference[oaicite:2]{index=2}
+        slots = svc.all_slots_by_color(color)
+        if slots:
+            write(f"Color {color}: slot(s) {', '.join(map(str, slots))}")
+        else:
+            write(f"No slots found for color {color}")
+
+    def lookupRegByColor() -> None:
+        if svc is None:
+            write("Please create the parking lot first.")
+            return
+        color = color_value.get().strip()
+        if not color:
+            write("Enter a color in the form above, then click the button.")
+            return
+        regs = svc.all_regnums_by_color(color)  # :contentReference[oaicite:3]{index=3}
+        if regs:
+            write(f"Registration numbers for color {color}: {', '.join(regs)}")
+        else:
+            write(f"No registrations found for color {color}")
 
     # ---------- Build UI ----------
     build_lot_section(root, num_value, ev_value, level_value, makeLot)
@@ -326,7 +383,7 @@ def main() -> None:  # noqa: PLR0915
         parkCar,
     )
     build_remove_section(root, slot_value, ev_car2_value, removeCar)
-    build_lookup_buttons(root, notImplementedYet)
+    build_lookup_buttons(root, lookupSlotByReg, lookupSlotByColor, lookupRegByColor)
     build_status_section(root, tfield, showChargeStatus, showStatus)
 
     root.mainloop()
