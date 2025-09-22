@@ -1,19 +1,31 @@
-# Parking Lot Manager — Baseline (Step 1)
+# Parking Lot Manager
 
-This is the untouched baseline from the provided prototype. We'll use it to capture the **original** behavior and diagrams before refactoring.
+A small, testable parking-lot system with:
+- Core domain classes (`Vehicle`, `ElectricVehicle`)
+- `ParkingService` (pure logic): park/leave, EV vs ICE pools, finders, CSV/JSON
+- Tk UI (`ParkingManager.py`) with lookups, persistence buttons, scrollable output
+- Optional CLI (`src/cli.py`) for headless usage
+- Tests, mypy typings, and ruff lint
 
-## Layout
-- `src/` — the original Python files exactly as provided (`ParkingManager.py`, `Vehicle.py`, `ElectricVehicle.py`)
-- `docs/` — project documentation will go here in later steps
+## Features
+- Separate ICE / EV slot pools with 1-based UI slot numbers
+- Vehicle factory for correct subclass creation
+- Safe slot state transitions (`Slot`), no sentinel values
+- Finders: by make/model/color/registration (UI uses status tables)
+- Persistence: JSON save/load; CSV export
+- UX: clear output, scrollback, enable/disable controls until lot exists
 
-## Run (baseline)
+## Quick Start
 ```bash
-cd src
-python ParkingManager.py
-```
-> Note: Tkinter comes with the standard Python installer on most platforms. If you see an error about `_tkinter`, install the Tk libraries for your OS.
+# create venv and install dev tools (optional)
+python -m venv .venv && . .venv/Scripts/activate  # Windows (or `source .venv/bin/activate` on mac/linux)
+pip install -r requirements-dev.txt
 
-## Next Steps
-1. Record **before** screenshots/video (Step 2).
-2. Add tooling config and initial tests (Step 3–5).
-3. Draw **original** UML (Step 6).
+# run UI
+python -m src.ParkingManager
+
+# run CLI (examples)
+python -m src.cli create --capacity 2 --ev-capacity 2 --level 1 --save lot.json
+python -m src.cli park --load lot.json --reg R1 --make Honda --model Civic --color Blue --kind CAR --save lot.json
+python -m src.cli status --load lot.json
+python -m src.cli export-csv --load lot.json status.csv

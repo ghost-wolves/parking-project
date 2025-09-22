@@ -1,0 +1,5 @@
+stateDiagram-v2
+%% REDESIGN • BEHAVIORAL: Slot state
+[*] --> VACANT
+VACANT --> OCCUPIED: occupy(vehicle)
+OCCUPIED --> VACANT: free()
