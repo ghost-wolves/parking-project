@@ -151,10 +151,10 @@ def build_lookup_buttons(
     on_slot_by_reg: Callable[[], None],
     on_slot_by_color: Callable[[], None],
     on_reg_by_color: Callable[[], None],
-) -> None:
+) -> dict[str, tk.Button]:
     tk.Label(root, text="", font="Arial 10").grid(row=12, column=0)  # spacer
 
-    tk.Button(
+    btn_slot_by_reg = tk.Button(
         root,
         command=on_slot_by_reg,
         text="Get Slot ID by Registration #",
@@ -164,9 +164,10 @@ def build_lookup_buttons(
         activebackground="teal",
         padx=5,
         pady=5,
-    ).grid(column=0, row=13, padx=4, pady=4, sticky="w")
+    )
+    btn_slot_by_reg.grid(column=0, row=13, padx=4, pady=4, sticky="w")
 
-    tk.Button(
+    btn_slot_by_color = tk.Button(
         root,
         command=on_slot_by_color,
         text="Get Slot ID by Color",
@@ -176,9 +177,10 @@ def build_lookup_buttons(
         activebackground="teal",
         padx=5,
         pady=5,
-    ).grid(column=2, row=13, padx=4, pady=4, sticky="w")
+    )
+    btn_slot_by_color.grid(column=2, row=13, padx=4, pady=4, sticky="w")
 
-    tk.Button(
+    btn_reg_by_color = tk.Button(
         root,
         command=on_reg_by_color,
         text="Get Registration # by Color",
@@ -188,7 +190,14 @@ def build_lookup_buttons(
         activebackground="teal",
         padx=5,
         pady=5,
-    ).grid(column=0, row=14, padx=4, pady=4, sticky="w")
+    )
+    btn_reg_by_color.grid(column=0, row=14, padx=4, pady=4, sticky="w")
+
+    return {
+        "slot_by_reg": btn_slot_by_reg,
+        "slot_by_color": btn_slot_by_color,
+        "reg_by_color": btn_reg_by_color,
+    }
 
 
 def build_status_section(
@@ -220,8 +229,21 @@ def build_status_section(
         padx=5,
         pady=5,
     ).grid(column=0, row=15, padx=4, pady=4, sticky="w")
+    # NOTE: tfield is placed in main() to support a scrollbar next to it.
 
-    tfield.grid(column=0, row=16, padx=10, pady=10, columnspan=4, sticky="w")
+
+def build_util_buttons(root: tk.Tk, on_clear: Callable[[], None]) -> None:
+    tk.Button(
+        root,
+        command=on_clear,
+        text="Clear Output",
+        font="Arial 11",
+        bg="MistyRose",
+        fg="black",
+        activebackground="LightSalmon",
+        padx=5,
+        pady=5,
+    ).grid(column=0, row=17, padx=4, pady=4, sticky="w")
 
 
 def build_persistence_buttons(
@@ -229,10 +251,10 @@ def build_persistence_buttons(
     on_save_json: Callable[[], None],
     on_load_json: Callable[[], None],
     on_export_csv: Callable[[], None],
-) -> None:
+) -> dict[str, tk.Button]:
     tk.Label(root, text="", font="Arial 10").grid(row=17, column=0)  # spacer under status area
 
-    tk.Button(
+    btn_save = tk.Button(
         root,
         command=on_save_json,
         text="Save JSON",
@@ -242,9 +264,10 @@ def build_persistence_buttons(
         activebackground="LightSteelBlue3",
         padx=5,
         pady=5,
-    ).grid(column=0, row=18, padx=4, pady=4, sticky="w")
+    )
+    btn_save.grid(column=0, row=18, padx=4, pady=4, sticky="w")
 
-    tk.Button(
+    btn_load = tk.Button(
         root,
         command=on_load_json,
         text="Load JSON",
@@ -254,9 +277,10 @@ def build_persistence_buttons(
         activebackground="LightSteelBlue3",
         padx=5,
         pady=5,
-    ).grid(column=1, row=18, padx=4, pady=4, sticky="w")
+    )
+    btn_load.grid(column=1, row=18, padx=4, pady=4, sticky="w")
 
-    tk.Button(
+    btn_export = tk.Button(
         root,
         command=on_export_csv,
         text="Export CSV",
@@ -266,14 +290,17 @@ def build_persistence_buttons(
         activebackground="LightSteelBlue3",
         padx=5,
         pady=5,
-    ).grid(column=2, row=18, padx=4, pady=4, sticky="w")
+    )
+    btn_export.grid(column=2, row=18, padx=4, pady=4, sticky="w")
+
+    return {"save": btn_save, "load": btn_load, "export": btn_export}
 
 
 # ----------------------------- Application --------------------------------- #
 def main() -> None:  # noqa: PLR0915
     # Tk root & state (locals, no globals)
     root = tk.Tk()
-    root.geometry("650x900")
+    root.geometry("650x980")  # taller so bottom buttons are visible
     root.resizable(False, False)
     root.title("Parking Lot Manager")
 
@@ -290,7 +317,10 @@ def main() -> None:  # noqa: PLR0915
     ev_motor_value = tk.IntVar(value=0)  # 1 = Motorcycle
     slot_value = tk.StringVar()
 
-    tfield = tk.Text(root, width=70, height=18)
+    # Text area + scrollbar (monospace for aligned columns)
+    tfield = tk.Text(root, width=70, height=18, font=("Courier New", 10))
+    scrollbar = tk.Scrollbar(root, command=tfield.yview)
+    tfield.configure(yscrollcommand=scrollbar.set)
 
     svc: ParkingService | None = None
 
@@ -298,6 +328,9 @@ def main() -> None:  # noqa: PLR0915
     def write(msg: str) -> None:
         tfield.insert(tk.INSERT, msg + ("\n" if not msg.endswith("\n") else ""))
         tfield.see(tk.END)
+
+    def clearOutput() -> None:
+        tfield.delete("1.0", tk.END)
 
     def makeLot() -> None:
         nonlocal svc
@@ -309,6 +342,7 @@ def main() -> None:  # noqa: PLR0915
             write(
                 f"Created a parking lot with {cap} regular slots and {evc} EV slots on level {lvl}"
             )
+            set_buttons_enabled(True)
         except ValueError as e:
             write(f"Error: {e}")
 
@@ -317,10 +351,10 @@ def main() -> None:  # noqa: PLR0915
             write("Please create the parking lot first.")
             return
         spec = VehicleSpec(
-            regnum=reg_value.get(),
-            make=make_value.get(),
-            model=model_value.get(),
-            color=color_value.get(),
+            regnum=reg_value.get().strip().upper(),
+            make=make_value.get().strip(),
+            model=model_value.get().strip(),
+            color=color_value.get().strip(),
             fuel="EV" if ev_car_value.get() == 1 else "ICE",
             kind="MOTORCYCLE" if ev_motor_value.get() == 1 else "CAR",
         )
@@ -362,13 +396,13 @@ def main() -> None:  # noqa: PLR0915
         for r in svc.ev_charge_rows():
             write(f"{r['slot_ui']}\t{r['level']}\t{r['regnum']}\t\t{r['charge']}")
 
-    # --------- Step 17: wired lookup handlers ---------
+    # --------- Lookups ---------
     def lookupSlotByReg() -> None:
         """Find slot(s) for the reg number currently in the Registration field."""
         if svc is None:
             write("Please create the parking lot first.")
             return
-        reg = reg_value.get().strip()
+        reg = reg_value.get().strip().upper()
         if not reg:
             write("Enter a registration number in the form above, then click the button.")
             return
@@ -412,7 +446,7 @@ def main() -> None:  # noqa: PLR0915
         else:
             write(f"No registrations found for color {color}")
 
-    # --------- Step 19: persistence handlers ---------
+    # --------- Persistence ---------
     def saveJson() -> None:
         if svc is None:
             messagebox.showinfo("Parking Manager", "Create or load a lot first.")
@@ -441,6 +475,7 @@ def main() -> None:  # noqa: PLR0915
         try:
             svc = ParkingService.load_json(path)
             write(f"Loaded lot from {path}")
+            set_buttons_enabled(True)
             showStatus()
         except Exception as e:  # noqa: BLE001
             messagebox.showerror("Load JSON failed", str(e))
@@ -475,10 +510,27 @@ def main() -> None:  # noqa: PLR0915
         parkCar,
     )
     build_remove_section(root, slot_value, ev_car2_value, removeCar)
-    build_lookup_buttons(root, lookupSlotByReg, lookupSlotByColor, lookupRegByColor)
+    lookup_btns = build_lookup_buttons(root, lookupSlotByReg, lookupSlotByColor, lookupRegByColor)
     build_status_section(root, tfield, showChargeStatus, showStatus)
-    build_persistence_buttons(root, saveJson, loadJson, exportCsv)
-    root.geometry("650x980")  # was 650x900
+    build_util_buttons(root, clearOutput)
+
+    # Place text area & scrollbar (kept here for layout control)
+    tfield.grid(column=0, row=16, padx=10, pady=10, columnspan=3, sticky="w")
+    scrollbar.grid(column=3, row=16, sticky="nsw", padx=(0, 10))
+
+    persist_btns = build_persistence_buttons(root, saveJson, loadJson, exportCsv)
+
+    # Enable/disable buttons depending on whether a lot exists
+    def set_buttons_enabled(enabled: bool) -> None:
+        state = tk.NORMAL if enabled else tk.DISABLED
+        for key in ("slot_by_reg", "slot_by_color", "reg_by_color"):
+            lookup_btns[key].config(state=state)
+        persist_btns["save"].config(state=state)
+        persist_btns["export"].config(state=state)
+        persist_btns["load"].config(state=tk.NORMAL)  # Load is always available
+
+    # Initially disabled until a lot is created or loaded
+    set_buttons_enabled(False)
 
     root.mainloop()
 
