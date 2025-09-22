@@ -25,3 +25,6 @@ warn_unreachable = true
 testpaths = ["tests"]
 addopts = "-q"
 pythonpath = ["src"]
+
+[project.scripts]
+parking = "cli:main"
