@@ -8,7 +8,8 @@ Tkinter UI wired to a pure ParkingService façade.
 from __future__ import annotations
 
 import tkinter as tk
-from collections.abc import Callable
+from tkinter import filedialog, messagebox
+from typing import Callable
 
 from parking_service import ParkingService, VehicleSpec
 
@@ -223,11 +224,56 @@ def build_status_section(
     tfield.grid(column=0, row=16, padx=10, pady=10, columnspan=4, sticky="w")
 
 
+def build_persistence_buttons(
+    root: tk.Tk,
+    on_save_json: Callable[[], None],
+    on_load_json: Callable[[], None],
+    on_export_csv: Callable[[], None],
+) -> None:
+    tk.Label(root, text="", font="Arial 10").grid(row=17, column=0)  # spacer under status area
+
+    tk.Button(
+        root,
+        command=on_save_json,
+        text="Save JSON",
+        font="Arial 11",
+        bg="LightSteelBlue1",
+        fg="black",
+        activebackground="LightSteelBlue3",
+        padx=5,
+        pady=5,
+    ).grid(column=0, row=18, padx=4, pady=4, sticky="w")
+
+    tk.Button(
+        root,
+        command=on_load_json,
+        text="Load JSON",
+        font="Arial 11",
+        bg="LightSteelBlue1",
+        fg="black",
+        activebackground="LightSteelBlue3",
+        padx=5,
+        pady=5,
+    ).grid(column=1, row=18, padx=4, pady=4, sticky="w")
+
+    tk.Button(
+        root,
+        command=on_export_csv,
+        text="Export CSV",
+        font="Arial 11",
+        bg="LightSteelBlue1",
+        fg="black",
+        activebackground="LightSteelBlue3",
+        padx=5,
+        pady=5,
+    ).grid(column=2, row=18, padx=4, pady=4, sticky="w")
+
+
 # ----------------------------- Application --------------------------------- #
 def main() -> None:  # noqa: PLR0915
     # Tk root & state (locals, no globals)
     root = tk.Tk()
-    root.geometry("650x850")
+    root.geometry("650x900")
     root.resizable(False, False)
     root.title("Parking Lot Manager")
 
@@ -239,7 +285,7 @@ def main() -> None:  # noqa: PLR0915
     color_value = tk.StringVar()
     reg_value = tk.StringVar()
     level_value = tk.StringVar(value="1")
-    ev_car_value = tk.IntVar(value=0)  # 1 = EV
+    ev_car_value = tk.IntVar(value=0)   # 1 = EV
     ev_car2_value = tk.IntVar(value=0)  # 1 = EV (for remove)
     ev_motor_value = tk.IntVar(value=0)  # 1 = Motorcycle
     slot_value = tk.StringVar()
@@ -316,7 +362,7 @@ def main() -> None:  # noqa: PLR0915
         for r in svc.ev_charge_rows():
             write(f"{r['slot_ui']}\t{r['level']}\t{r['regnum']}\t\t{r['charge']}")
 
-    # --------- Step 17: wired lookup handlers (no service changes required) ---------
+    # --------- Step 17: wired lookup handlers ---------
     def lookupSlotByReg() -> None:
         """Find slot(s) for the reg number currently in the Registration field."""
         if svc is None:
@@ -326,8 +372,6 @@ def main() -> None:  # noqa: PLR0915
         if not reg:
             write("Enter a registration number in the form above, then click the button.")
             return
-
-        # Use status tables (works with current service API) :contentReference[oaicite:1]{index=1}
         slots: list[int] = []
         for row in svc.status_rows():
             if row["regnum"] == reg:
@@ -335,7 +379,6 @@ def main() -> None:  # noqa: PLR0915
         for row in svc.ev_status_rows():
             if row["regnum"] == reg:
                 slots.append(row["slot_ui"])
-
         if slots:
             write(f"Registration {reg} found in slot(s): {', '.join(map(str, slots))}")
         else:
@@ -349,7 +392,6 @@ def main() -> None:  # noqa: PLR0915
         if not color:
             write("Enter a color in the form above, then click the button.")
             return
-        # Uses service finder (returns 1-based slots) :contentReference[oaicite:2]{index=2}
         slots = svc.all_slots_by_color(color)
         if slots:
             write(f"Color {color}: slot(s) {', '.join(map(str, slots))}")
@@ -364,11 +406,61 @@ def main() -> None:  # noqa: PLR0915
         if not color:
             write("Enter a color in the form above, then click the button.")
             return
-        regs = svc.all_regnums_by_color(color)  # :contentReference[oaicite:3]{index=3}
+        regs = svc.all_regnums_by_color(color)
         if regs:
             write(f"Registration numbers for color {color}: {', '.join(regs)}")
         else:
             write(f"No registrations found for color {color}")
+
+    # --------- Step 19: persistence handlers ---------
+    def saveJson() -> None:
+        if svc is None:
+            messagebox.showinfo("Parking Manager", "Create or load a lot first.")
+            return
+        path = filedialog.asksaveasfilename(
+            title="Save lot as JSON",
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            svc.save_json(path)
+            write(f"Saved lot to {path}")
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("Save JSON failed", str(e))
+
+    def loadJson() -> None:
+        nonlocal svc
+        path = filedialog.askopenfilename(
+            title="Load lot JSON",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            svc = ParkingService.load_json(path)
+            write(f"Loaded lot from {path}")
+            showStatus()
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("Load JSON failed", str(e))
+
+    def exportCsv() -> None:
+        if svc is None:
+            messagebox.showinfo("Parking Manager", "Create or load a lot first.")
+            return
+        path = filedialog.asksaveasfilename(
+            title="Export status CSV",
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            svc.save_csv(path, include_ev=True)
+            write(f"Exported CSV to {path}")
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("Export CSV failed", str(e))
 
     # ---------- Build UI ----------
     build_lot_section(root, num_value, ev_value, level_value, makeLot)
@@ -385,6 +477,7 @@ def main() -> None:  # noqa: PLR0915
     build_remove_section(root, slot_value, ev_car2_value, removeCar)
     build_lookup_buttons(root, lookupSlotByReg, lookupSlotByColor, lookupRegByColor)
     build_status_section(root, tfield, showChargeStatus, showStatus)
+    build_persistence_buttons(root, saveJson, loadJson, exportCsv)
 
     root.mainloop()
 
