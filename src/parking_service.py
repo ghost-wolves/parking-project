@@ -304,3 +304,114 @@ class ParkingService:
         slots = self.all_slots_by_reg(regnum)
         return slots[0] if slots else None
 
+    # --- Persistence / Export ---
+
+    def to_dict(self) -> dict:
+        """Serialize lot state to a plain dict (JSON-safe)."""
+        def veh2d(v):
+            if v is None:
+                return None
+            # Determine fuel by presence of 'charge' attribute (EV) vs not (ICE)
+            fuel = "EV" if hasattr(v, "charge") else "ICE"
+            # Map concrete class to kind
+            cls = v.__class__.__name__
+            if fuel == "EV":
+                kind = "CAR" if "Car" in cls else "MOTORCYCLE"
+            else:
+                if "Truck" in cls:
+                    kind = "TRUCK"
+                elif "Bus" in cls:
+                    kind = "BUS"
+                elif "Motorcycle" in cls:
+                    kind = "MOTORCYCLE"
+                else:
+                    kind = "CAR"
+            out = {
+                "regnum": v.regnum,
+                "make": v.make,
+                "model": v.model,
+                "color": v.color,
+                "fuel": fuel,
+                "kind": kind,
+            }
+            if fuel == "EV":
+                out["charge"] = getattr(v, "charge", 0)
+            return out
+
+        return {
+            "level": self.level,
+            "capacity": self.capacity,
+            "ev_capacity": self.ev_capacity,
+            "slots": [veh2d(s.vehicle) for s in self.slots],
+            "evSlots": [veh2d(s.vehicle) for s in self.evSlots],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ParkingService":
+        """Construct a ParkingService from a dict produced by to_dict()."""
+        svc = cls(
+            capacity=int(data.get("capacity", 0)),
+            ev_capacity=int(data.get("ev_capacity", 0)),
+            level=int(data.get("level", 1)),
+        )
+        # Recreate vehicles via factory and occupy slots in order
+        from vehicle_factory import create as create_vehicle  # local import to avoid cycles
+        for i, v in enumerate(data.get("slots", [])):
+            if v:
+                entity = create_vehicle(
+                    v["regnum"], v["make"], v["model"], v["color"], v["fuel"], v["kind"]
+                )
+                svc.slots[i].occupy(entity)
+        for i, v in enumerate(data.get("evSlots", [])):
+            if v:
+                entity = create_vehicle(
+                    v["regnum"], v["make"], v["model"], v["color"], v["fuel"], v["kind"]
+                )
+                # Preserve EV charge if present
+                if "charge" in v:
+                    setattr(entity, "charge", int(v["charge"]))
+                svc.evSlots[i].occupy(entity)
+        return svc
+
+    def save_json(self, path: str) -> None:
+        """Write the current lot to a JSON file."""
+        import json
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(self.to_dict(), f, indent=2)
+
+    @classmethod
+    def load_json(cls, path: str) -> "ParkingService":
+        """Read a lot from a JSON file and return a fresh service instance."""
+        import json
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return cls.from_dict(data)
+
+    def to_csv_rows(self, include_ev: bool = True) -> list[list[str]]:
+        """
+        Return a combined CSV-like table:
+        header + rows of ICE (then EV if include_ev=True).
+        """
+        header = ["slot_ui", "level", "regnum", "color", "make", "model", "fuel"]
+        rows: list[list[str]] = [header]
+        for r in self.status_rows():
+            rows.append([
+                str(r["slot_ui"]), str(r["level"]), r["regnum"],
+                r["color"], r["make"], r["model"], "ICE",
+            ])
+        if include_ev:
+            for r in self.ev_status_rows():
+                rows.append([
+                    str(r["slot_ui"]), str(r["level"]), r["regnum"],
+                    r["color"], r["make"], r["model"], "EV",
+                ])
+        return rows
+
+    def save_csv(self, path: str, include_ev: bool = True) -> None:
+        """Write a combined status CSV to disk."""
+        import csv
+        rows = self.to_csv_rows(include_ev=include_ev)
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerows(rows)
+
